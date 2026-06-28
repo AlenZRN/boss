@@ -2,11 +2,13 @@ package com.aimira.monitor.collector;
 
 import com.aimira.monitor.config.AliyunConfig;
 import com.aimira.monitor.entity.ResourceInfo;
+import com.aliyuncs.CommonRequest;
+import com.aliyuncs.CommonResponse;
 import com.aliyuncs.IAcsClient;
-import com.aliyuncs.ecs.model.v20140526.DescribeInstancesRequest;
-import com.aliyuncs.ecs.model.v20140526.DescribeInstancesResponse;
-import com.aliyuncs.ecs.model.v20140526.DescribeInstancesResponse.Instance;
 import com.aliyuncs.exceptions.ClientException;
+import com.aliyuncs.http.MethodType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -18,8 +20,8 @@ import java.util.List;
 
 /**
  * 资源信息采集器
- * 采集 ECS、RDS、SLB 等云资源基本信息及到期时间
- * MVP 先实现 ECS 采集，后续扩展其他产品
+ * 使用 CommonRequest 调用各产品 API 采集云资源信息
+ * MVP 先实现 ECS，后续扩展 RDS/SLB/Redis
  */
 @Slf4j
 @Component
@@ -27,6 +29,7 @@ public class ResourceCollector {
 
     private final AliyunClientFactory clientFactory;
     private final AliyunConfig aliyunConfig;
+    private final ObjectMapper objectMapper;
 
     private static final DateTimeFormatter ALIYUN_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
@@ -34,11 +37,11 @@ public class ResourceCollector {
     public ResourceCollector(AliyunClientFactory clientFactory, AliyunConfig aliyunConfig) {
         this.clientFactory = clientFactory;
         this.aliyunConfig = aliyunConfig;
+        this.objectMapper = new ObjectMapper();
     }
 
     /**
-     * 采集所有支持资源类型的基础信息
-     * @return 资源信息列表
+     * 采集所有支持的资源类型
      */
     public List<ResourceInfo> collectAll() {
         List<ResourceInfo> allResources = new ArrayList<>();
@@ -49,30 +52,38 @@ public class ResourceCollector {
     }
 
     /**
-     * 采集 ECS 实例信息
+     * 采集 ECS 实例
      */
     private List<ResourceInfo> collectEcsInstances() {
         List<ResourceInfo> resources = new ArrayList<>();
         try {
             IAcsClient client = clientFactory.createClient();
-            DescribeInstancesRequest request = new DescribeInstancesRequest();
-            request.setPageSize(100);
 
-            DescribeInstancesResponse response = client.getAcsResponse(request);
-            if (response.getInstances() == null || response.getInstances().isEmpty()) {
+            CommonRequest request = new CommonRequest();
+            request.setSysMethod(MethodType.POST);
+            request.setSysDomain("ecs.aliyuncs.com");
+            request.setSysVersion("2014-05-26");
+            request.setSysAction("DescribeInstances");
+            request.putQueryParameter("PageSize", "100");
+
+            CommonResponse response = client.getCommonResponse(request);
+            JsonNode root = objectMapper.readTree(response.getData());
+
+            JsonNode instances = root.path("Instances").path("Instance");
+            if (!instances.isArray() || instances.isEmpty()) {
                 log.info("当前 Region 无 ECS 实例");
                 return resources;
             }
 
             LocalDateTime now = LocalDateTime.now();
-            for (Instance instance : response.getInstances()) {
+            for (JsonNode instance : instances) {
                 ResourceInfo info = ResourceInfo.builder()
-                        .resourceId(instance.getInstanceId())
-                        .resourceName(instance.getInstanceName())
+                        .resourceId(instance.path("InstanceId").asText())
+                        .resourceName(instance.path("InstanceName").asText())
                         .resourceType("ECS")
                         .region(aliyunConfig.getRegion())
-                        .status(instance.getStatus())
-                        .expireTime(parseExpireTime(instance.getExpiredTime()))
+                        .status(instance.path("Status").asText())
+                        .expireTime(parseExpireTime(instance.path("ExpiredTime").asText()))
                         .syncTime(now)
                         .build();
                 resources.add(info);
@@ -80,14 +91,12 @@ public class ResourceCollector {
             log.info("ECS 采集成功: region={}, count={}", aliyunConfig.getRegion(), resources.size());
         } catch (ClientException e) {
             log.error("ECS 采集 API 调用异常: {}", e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("ECS 采集响应解析异常: {}", e.getMessage(), e);
         }
         return resources;
     }
 
-    /**
-     * 解析阿里云返回的到期时间字符串
-     * 格式: "yyyy-MM-dd'T'HH:mm:ss'Z'" (UTC)
-     */
     private LocalDateTime parseExpireTime(String expiredTime) {
         if (expiredTime == null || expiredTime.isBlank()) {
             return null;

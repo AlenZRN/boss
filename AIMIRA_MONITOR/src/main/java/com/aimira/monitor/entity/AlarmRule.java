@@ -41,6 +41,7 @@ public class AlarmRule {
     private String operator;
 
     /** 是否启用 */
+    @Builder.Default
     @Column(nullable = false)
     private Boolean enabled = true;
 

@@ -61,32 +61,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Aliyun SDK - BSSOpenApi (余额/费用) -->
-        <dependency>
-            <groupId>com.aliyun</groupId>
-            <artifactId>aliyun-java-sdk-bssopenapi</artifactId>
-            <version>2.2.1</version>
-        </dependency>
-
-        <!-- Aliyun SDK - Core -->
+        <!-- Aliyun SDK Core (通用请求 + 签名) -->
         <dependency>
             <groupId>com.aliyun</groupId>
             <artifactId>aliyun-java-sdk-core</artifactId>
             <version>4.6.4</version>
-        </dependency>
-
-        <!-- Aliyun SDK - ECS (资源采集) -->
-        <dependency>
-            <groupId>com.aliyun</groupId>
-            <artifactId>aliyun-java-sdk-ecs</artifactId>
-            <version>4.24.94</version>
-        </dependency>
-
-        <!-- Aliyun SDK - RDS (资源采集) -->
-        <dependency>
-            <groupId>com.aliyun</groupId>
-            <artifactId>aliyun-java-sdk-rds</artifactId>
-            <version>3.8.2</version>
         </dependency>
 
         <!-- Lombok -->

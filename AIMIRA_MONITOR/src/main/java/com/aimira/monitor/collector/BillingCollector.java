@@ -1,10 +1,13 @@
 package com.aimira.monitor.collector;
 
 import com.aimira.monitor.entity.BillingHistory;
+import com.aliyuncs.CommonRequest;
+import com.aliyuncs.CommonResponse;
 import com.aliyuncs.IAcsClient;
-import com.aliyuncs.bssopenapi.model.v20171214.QueryBillRequest;
-import com.aliyuncs.bssopenapi.model.v20171214.QueryBillResponse;
 import com.aliyuncs.exceptions.ClientException;
+import com.aliyuncs.http.MethodType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -15,51 +18,58 @@ import java.util.Optional;
 
 /**
  * 费用信息采集器
- * 调用 BSSOpenApi QueryBill 接口获取今日/本月费用
+ * 使用 CommonRequest 调用 BSSOpenApi QueryBill
  */
 @Slf4j
 @Component
 public class BillingCollector {
 
     private final AliyunClientFactory clientFactory;
+    private final ObjectMapper objectMapper;
 
     public BillingCollector(AliyunClientFactory clientFactory) {
         this.clientFactory = clientFactory;
+        this.objectMapper = new ObjectMapper();
     }
 
     /**
      * 采集今日费用及本月累计费用
-     * @return 费用历史记录，失败时返回 Optional.empty()
      */
     public Optional<BillingHistory> collect() {
         try {
             IAcsClient client = clientFactory.createClient();
 
             LocalDateTime now = LocalDateTime.now();
-            // 今日账单：查询当天
+            String billingCycle = now.getYear() + "-" + String.format("%02d", now.getMonthValue());
             String todayStr = now.toLocalDate().toString();
 
-            QueryBillRequest request = new QueryBillRequest();
-            request.setBillingCycle(now.getYear() + "-" + String.format("%02d", now.getMonthValue()));
-            request.setType("PayAsYouGoBill");
-            request.setPageNum(1);
-            request.setPageSize(100);
+            CommonRequest request = new CommonRequest();
+            request.setSysMethod(MethodType.POST);
+            request.setSysDomain("bssopenapi.aliyuncs.com");
+            request.setSysVersion("2017-12-14");
+            request.setSysAction("QueryBill");
+            request.putQueryParameter("BillingCycle", billingCycle);
+            request.putQueryParameter("Type", "PayAsYouGoBill");
+            request.putQueryParameter("PageNum", "1");
+            request.putQueryParameter("PageSize", "100");
 
-            QueryBillResponse response = client.getAcsResponse(request);
+            CommonResponse response = client.getCommonResponse(request);
+            JsonNode root = objectMapper.readTree(response.getData());
 
-            if (response.getCode() != null && "Success".equalsIgnoreCase(response.getCode())) {
-                QueryBillResponse.Data data = response.getData();
+            String code = root.path("Code").asText();
+            if ("Success".equalsIgnoreCase(code)) {
+                JsonNode data = root.path("Data");
+                JsonNode items = data.path("Items").path("Item");
 
                 BigDecimal dailyCost = BigDecimal.ZERO;
                 BigDecimal monthlyCost = BigDecimal.ZERO;
 
-                if (data.getItems() != null && data.getItems().getItem() != null) {
-                    for (QueryBillResponse.Data.Items.Item item : data.getItems().getItem()) {
-                        BigDecimal amount = parseBigDecimal(item.getPretaxAmount());
+                if (items.isArray()) {
+                    for (JsonNode item : items) {
+                        BigDecimal amount = parseBigDecimal(item.path("PretaxAmount").asText());
                         monthlyCost = monthlyCost.add(amount);
 
-                        // 按日期筛选当日费用
-                        if (todayStr.equals(item.getUsageEndDate())) {
+                        if (todayStr.equals(item.path("UsageEndDate").asText())) {
                             dailyCost = dailyCost.add(amount);
                         }
                     }
@@ -77,11 +87,14 @@ public class BillingCollector {
                 return Optional.of(history);
             } else {
                 log.warn("费用采集API返回失败: code={}, message={}",
-                        response.getCode(), response.getMessage());
+                        code, root.path("Message").asText());
                 return Optional.empty();
             }
         } catch (ClientException e) {
             log.error("费用采集 API 调用异常: {}", e.getMessage(), e);
+            return Optional.empty();
+        } catch (Exception e) {
+            log.error("费用采集响应解析异常: {}", e.getMessage(), e);
             return Optional.empty();
         }
     }
