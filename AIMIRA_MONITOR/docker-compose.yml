@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # ---- PostgreSQL ----
+  postgres:
+    image: postgres:16-alpine
+    container_name: aimira-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aimira_monitor
+      POSTGRES_USER: aimira
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-aimira123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./src/main/resources/db/migration:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aimira -d aimira_monitor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- ARM 应用 ----
+  app:
+    build: .
+    container_name: aimira-monitor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Spring
+      SPRING_PROFILES_ACTIVE: prod
+      APP_PORT: "8080"
+      # Database
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: aimira_monitor
+      DB_USERNAME: aimira
+      DB_PASSWORD: ${DB_PASSWORD:-aimira123}
+      # Aliyun (通过环境变量覆盖)
+      ALIYUN_ACCESS_KEY: ${ALIYUN_ACCESS_KEY}
+      ALIYUN_SECRET: ${ALIYUN_SECRET}
+      ALIYUN_REGION: ${ALIYUN_REGION:-cn-hangzhou}
+      # WeChat Work
+      WECOM_WEBHOOK_URL: ${WECOM_WEBHOOK_URL}
+      WECOM_ENABLED: ${WECOM_ENABLED:-true}
+      # Scheduler
+      SCHEDULER_COLLECT_CRON: ${SCHEDULER_COLLECT_CRON:-0 0 * * * *}
+      SCHEDULER_ALARM_CRON: ${SCHEDULER_ALARM_CRON:-0 0 * * * *}
+      ALARM_COOLDOWN_SECONDS: ${ALARM_COOLDOWN_SECONDS:-86400}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

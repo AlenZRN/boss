@@ -1,0 +1,50 @@
+server:
+  port: ${APP_PORT:8080}
+
+spring:
+  application:
+    name: aimira-monitor
+
+  # 默认 Profile: 使用 H2 (本地开发无需 PostgreSQL)
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+
+# ---- 阿里云配置 ----
+aliyun:
+  access-key: ${ALIYUN_ACCESS_KEY:}
+  secret: ${ALIYUN_SECRET:}
+  region: ${ALIYUN_REGION:cn-hangzhou}
+
+# ---- 企业微信配置 ----
+wecom:
+  webhook-url: ${WECOM_WEBHOOK_URL:}
+  enabled: ${WECOM_ENABLED:true}
+
+# ---- 定时任务配置 ----
+scheduler:
+  # 数据采集: 默认每小时 (秒 分 时 日 月 周)
+  collect-cron: ${SCHEDULER_COLLECT_CRON:0 0 * * * *}
+  # 告警检测: 默认每小时
+  alarm-cron: ${SCHEDULER_ALARM_CRON:0 0 * * * *}
+  # 告警冷却时间（秒），默认 86400 = 24小时
+  alarm-cooldown-seconds: ${ALARM_COOLDOWN_SECONDS:86400}
+
+# ---- 日志配置 ----
+logging:
+  level:
+    root: INFO
+    com.aimira.monitor: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
