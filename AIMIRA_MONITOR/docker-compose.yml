@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # ---- PostgreSQL ----
   postgres:
-    image: postgres:16-alpine
+    image: docker.m.daocloud.io/library/postgres:16-alpine
     container_name: aimira-postgres
     restart: unless-stopped
     environment:
