@@ -6,6 +6,7 @@ import com.aliyuncs.CommonResponse;
 import com.aliyuncs.IAcsClient;
 import com.aliyuncs.exceptions.ClientException;
 import com.aliyuncs.http.MethodType;
+import com.aliyuncs.http.ProtocolType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -40,16 +41,20 @@ public class BalanceCollector {
             IAcsClient client = clientFactory.createClient();
 
             CommonRequest request = new CommonRequest();
+            request.setSysProtocol(ProtocolType.HTTPS);
             request.setSysMethod(MethodType.POST);
-            request.setSysDomain("bssopenapi.aliyuncs.com");
+            request.setSysDomain("business.aliyuncs.com");
             request.setSysVersion("2017-12-14");
             request.setSysAction("QueryAccountBalance");
 
             CommonResponse response = client.getCommonResponse(request);
-            JsonNode root = objectMapper.readTree(response.getData());
+            String responseData = response.getData();
+            log.info("余额采集 API 原始响应: {}", responseData);
+            JsonNode root = objectMapper.readTree(responseData);
 
             String code = root.path("Code").asText();
-            if ("Success".equalsIgnoreCase(code)) {
+            // QueryAccountBalance 成功时返回 Code="200"，不是 "Success"
+            if ("200".equals(code) || "Success".equalsIgnoreCase(code)) {
                 JsonNode data = root.path("Data");
 
                 BalanceHistory history = BalanceHistory.builder()
@@ -68,10 +73,11 @@ public class BalanceCollector {
                 return Optional.empty();
             }
         } catch (ClientException e) {
-            log.error("余额采集 API 调用异常: {}", e.getMessage(), e);
+            log.error("余额采集 API 调用异常: errorCode={}", e.getErrCode());
+            log.debug("余额采集完整异常", e);
             return Optional.empty();
         } catch (Exception e) {
-            log.error("余额采集响应解析异常: {}", e.getMessage(), e);
+            log.error("余额采集响应解析异常", e);
             return Optional.empty();
         }
     }

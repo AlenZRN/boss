@@ -18,6 +18,7 @@
 | 通知 | 企业微信机器人 Webhook (Markdown) | — |
 | 构建 | Maven | 3.9+ |
 | 部署 | Docker + docker-compose | — |
+| API 文档 | SpringDoc OpenAPI (Swagger UI) | 2.6.0 |
 | 工具 | Lombok, Jackson, Actuator | — |
 
 ---
@@ -35,6 +36,7 @@ boss/AIMIRA_MONITOR/
 ├── 需求文档.md                                 # MVP 需求文档(中文)
 ├── diff-review_claude.md                      # 代码评审任务模板(通用参考)
 ├── CLOUDE.md                                  # 本文件 — 项目开发指南
+├── 踩坑记录.md                                  # 阿里云 SDK 集成踩坑记录
 └── src/
     ├── main/java/com/aimira/monitor/
     │   ├── ArmApplication.java                # 主入口 @SpringBootApplication + @EnableScheduling
@@ -71,8 +73,8 @@ boss/AIMIRA_MONITOR/
     │   │   ├── ResourceInfo.java              # 云资源信息
     │   │   ├── AlarmRule.java                 # 告警规则
     │   │   └── AlarmRecord.java               # 告警发送记录(用于去重)
-    │   ├── dashboard/                         # Dashboard REST API
-    │   │   └── DashboardController.java       # /api/dashboard/* 全部端点
+    │   ├── dashboard/                         # Dashboard REST API + Swagger 注解
+    │   │   └── DashboardController.java       # /api/dashboard/* + trigger 手动触发
     │   └── dto/                               # 数据传输对象
     │       ├── ApiResponse.java               # 统一响应体 {code, message, data}
     │       └── DashboardDTO.java              # Dashboard 嵌套 DTO 结构
@@ -156,6 +158,17 @@ boss/AIMIRA_MONITOR/
 | POST | `/api/dashboard/alarm-rules` | 创建规则 |
 | PUT | `/api/dashboard/alarm-rules/{id}` | 更新规则 |
 | DELETE | `/api/dashboard/alarm-rules/{id}` | 删除规则 |
+
+### 手动触发
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/dashboard/trigger/collect` | 立即执行数据采集（余额+账单+资源） |
+| POST | `/api/dashboard/trigger/alarm` | 立即执行告警检测 |
+
+### Swagger UI
+
+启动后访问 `http://localhost:8080/swagger-ui.html` 可查看和调试所有接口。
 
 **统一响应格式：**
 ```json
@@ -343,6 +356,11 @@ docker compose up -d
 | 6 | 项目整体 | 无事务管理 (单表操作暂不影响，多表操作时需补充 `@Transactional`) | P2 |
 | 7 | 项目整体 | Entity 使用 `@PrePersist`/`@PreUpdate` 设置时间戳，但未使用 `@MappedSuperclass` 提取公共字段 | P3 |
 | 8 | 项目整体 | 无单元测试覆盖 (仅一个空的上下文加载测试) | P1 |
+| 9 | `BillingCollector.java` | 域名仍为错误的 `bssopenapi.aliyuncs.com`，需改为 `business.aliyuncs.com` 并加 HTTPS | P0 |
+| 10 | `ResourceCollector.java` | 缺少 HTTPS 显式声明，AK 泄漏风险同 BalanceCollector | P0 |
+| 11 | `BalanceCollector.java` | 域名和 HTTPS 已修复，AK泄漏已处理 ✅ | — |
+
+> 📝 踩坑详情见 `踩坑记录.md`
 
 ---
 

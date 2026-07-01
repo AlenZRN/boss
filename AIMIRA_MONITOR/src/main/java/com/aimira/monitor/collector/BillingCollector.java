@@ -6,6 +6,7 @@ import com.aliyuncs.CommonResponse;
 import com.aliyuncs.IAcsClient;
 import com.aliyuncs.exceptions.ClientException;
 import com.aliyuncs.http.MethodType;
+import com.aliyuncs.http.ProtocolType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -44,8 +45,9 @@ public class BillingCollector {
             String todayStr = now.toLocalDate().toString();
 
             CommonRequest request = new CommonRequest();
+            request.setSysProtocol(ProtocolType.HTTPS);
             request.setSysMethod(MethodType.POST);
-            request.setSysDomain("bssopenapi.aliyuncs.com");
+            request.setSysDomain("business.aliyuncs.com");
             request.setSysVersion("2017-12-14");
             request.setSysAction("QueryBill");
             request.putQueryParameter("BillingCycle", billingCycle);

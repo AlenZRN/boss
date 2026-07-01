@@ -161,7 +161,7 @@ public class AlarmDetector {
 
     private String buildBalanceAlarmMessage(AlarmRule rule, BalanceHistory balance) {
         return String.format("""
-                ## ⚠️ 余额告警
+                ## ⚠️ 阿里云余额告警
                 > 规则: **%s**
                 > 当前余额: **%s %s**
                 > 告警阈值: **%s %s**
@@ -177,7 +177,7 @@ public class AlarmDetector {
 
     private String buildExpiryAlarmMessage(AlarmRule rule, ResourceInfo resource, long daysLeft) {
         return String.format("""
-                ## ⏰ 资源到期告警
+                ## ⏰ 阿里云资源到期告警
                 > 规则: **%s**
                 > 资源名称: **%s**
                 > 资源ID: %s

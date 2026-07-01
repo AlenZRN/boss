@@ -68,6 +68,7 @@ mvn spring-boot:run
 ```
 
 启动后访问：
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
 - Dashboard API: `http://localhost:8080/api/dashboard/overview`
 - H2 控制台: `http://localhost:8080/h2-console`
 - Health Check: `http://localhost:8080/actuator/health`
@@ -214,6 +215,27 @@ curl -X POST http://localhost:8080/api/dashboard/alarm-rules \
 **告警类型：** `BALANCE`（余额告警）、`EXPIRY`（到期告警）
 
 **操作符：** `LESS_THAN`、`LESS_THAN_OR_EQUAL`、`GREATER_THAN`、`GREATER_THAN_OR_EQUAL`
+
+### 手动触发
+
+便于更新代码后立即验证功能，无需等待整点定时任务：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/dashboard/trigger/collect` | 立即执行数据采集（余额+账单+资源） |
+| `POST` | `/api/dashboard/trigger/alarm` | 立即执行告警检测 |
+
+```bash
+# 手动触发采集
+curl -X POST http://localhost:8080/api/dashboard/trigger/collect
+
+# 手动触发告警
+curl -X POST http://localhost:8080/api/dashboard/trigger/alarm
+```
+
+### Swagger UI
+
+启动后浏览器访问 `http://localhost:8080/swagger-ui.html`，可直接查看和调试所有接口。
 
 ### 健康检查
 
