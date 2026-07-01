@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +24,8 @@ import java.util.List;
 @Slf4j
 @Component
 public class AlarmDetector {
+
+    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final AlarmRuleRepository alarmRuleRepository;
     private final AlarmRecordRepository alarmRecordRepository;
@@ -172,7 +175,7 @@ public class AlarmDetector {
                 balance.getBalance(), balance.getCurrency(),
                 rule.getThreshold(), balance.getCurrency(),
                 balance.getAvailableAmount(), balance.getCurrency(),
-                LocalDateTime.now().toString().replace("T", " ").substring(0, 19));
+                FMT.format(LocalDateTime.now()));
     }
 
     private String buildExpiryAlarmMessage(AlarmRule rule, ResourceInfo resource, long daysLeft) {
@@ -192,8 +195,8 @@ public class AlarmDetector {
                 resource.getResourceId(),
                 resource.getResourceType(),
                 resource.getRegion(),
-                resource.getExpireTime() != null ? resource.getExpireTime().toString().replace("T", " ").substring(0, 19) : "未知",
+                resource.getExpireTime() != null ? FMT.format(resource.getExpireTime()) : "未知",
                 daysLeft,
-                LocalDateTime.now().toString().replace("T", " ").substring(0, 19));
+                FMT.format(LocalDateTime.now()));
     }
 }

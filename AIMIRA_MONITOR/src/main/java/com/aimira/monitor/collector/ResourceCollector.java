@@ -7,6 +7,7 @@ import com.aliyuncs.CommonResponse;
 import com.aliyuncs.IAcsClient;
 import com.aliyuncs.exceptions.ClientException;
 import com.aliyuncs.http.MethodType;
+import com.aliyuncs.http.ProtocolType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +22,7 @@ import java.util.List;
 /**
  * 资源信息采集器
  * 使用 CommonRequest 调用各产品 API 采集云资源信息
- * MVP 先实现 ECS，后续扩展 RDS/SLB/Redis
+ * 支持: ECS / SWAS(轻量应用服务器) / RDS
  */
 @Slf4j
 @Component
@@ -46,53 +47,170 @@ public class ResourceCollector {
     public List<ResourceInfo> collectAll() {
         List<ResourceInfo> allResources = new ArrayList<>();
         allResources.addAll(collectEcsInstances());
-        // TODO: V2 - 添加 RDS、SLB、Redis 等资源采集
+        allResources.addAll(collectSwasInstances());
+        allResources.addAll(collectRdsInstances());
         log.info("资源采集完成, 共 {} 条", allResources.size());
         return allResources;
     }
 
     /**
-     * 采集 ECS 实例
+     * 采集 ECS 实例（遍历所有配置的地域）
      */
     private List<ResourceInfo> collectEcsInstances() {
         List<ResourceInfo> resources = new ArrayList<>();
-        try {
-            IAcsClient client = clientFactory.createClient();
+        for (String region : aliyunConfig.getEffectiveRegions()) {
+            try {
+                IAcsClient client = clientFactory.createClient(region);
 
-            CommonRequest request = new CommonRequest();
-            request.setSysMethod(MethodType.POST);
-            request.setSysDomain("ecs.aliyuncs.com");
-            request.setSysVersion("2014-05-26");
-            request.setSysAction("DescribeInstances");
-            request.putQueryParameter("PageSize", "100");
+                CommonRequest request = new CommonRequest();
+                request.setSysProtocol(ProtocolType.HTTPS);
+                request.setSysMethod(MethodType.POST);
+                request.setSysDomain("ecs.aliyuncs.com");
+                request.setSysVersion("2014-05-26");
+                request.setSysAction("DescribeInstances");
+                request.putQueryParameter("RegionId", region);
+                request.putQueryParameter("PageSize", "100");
 
-            CommonResponse response = client.getCommonResponse(request);
-            JsonNode root = objectMapper.readTree(response.getData());
+                CommonResponse response = client.getCommonResponse(request);
+                String responseData = response.getData();
+                log.debug("ECS API 响应: region={}, body={}", region, responseData);
+                JsonNode root = objectMapper.readTree(responseData);
 
-            JsonNode instances = root.path("Instances").path("Instance");
-            if (!instances.isArray() || instances.isEmpty()) {
-                log.info("当前 Region 无 ECS 实例");
-                return resources;
+                JsonNode instances = root.path("Instances").path("Instance");
+                if (!instances.isArray() || instances.isEmpty()) {
+                    log.info("ECS: region={} 无实例", region);
+                    continue;
+                }
+
+                LocalDateTime now = LocalDateTime.now();
+                for (JsonNode instance : instances) {
+                    resources.add(ResourceInfo.builder()
+                            .resourceId(instance.path("InstanceId").asText())
+                            .resourceName(instance.path("InstanceName").asText())
+                            .resourceType("ECS")
+                            .region(region)
+                            .status(instance.path("Status").asText())
+                            .expireTime(parseExpireTime(instance.path("ExpiredTime").asText()))
+                            .syncTime(now)
+                            .build());
+                }
+                log.info("ECS 采集成功: region={}, count={}", region, instances.size());
+            } catch (ClientException e) {
+                log.error("ECS 采集 API 异常: region={}, errorCode={}", region, e.getErrCode());
+                log.debug("ECS 采集完整异常", e);
+            } catch (Exception e) {
+                log.error("ECS 采集解析异常: region={}, {}", region, e.getMessage(), e);
             }
+        }
+        return resources;
+    }
 
-            LocalDateTime now = LocalDateTime.now();
-            for (JsonNode instance : instances) {
-                ResourceInfo info = ResourceInfo.builder()
-                        .resourceId(instance.path("InstanceId").asText())
-                        .resourceName(instance.path("InstanceName").asText())
-                        .resourceType("ECS")
-                        .region(aliyunConfig.getRegion())
-                        .status(instance.path("Status").asText())
-                        .expireTime(parseExpireTime(instance.path("ExpiredTime").asText()))
-                        .syncTime(now)
-                        .build();
-                resources.add(info);
+    /**
+     * 采集轻量应用服务器 (SWAS) 实例（遍历所有配置的地域）
+     * 注意：SWAS 不支持中心域名，必须使用区域域名 swas.{region}.aliyuncs.com
+     */
+    private List<ResourceInfo> collectSwasInstances() {
+        List<ResourceInfo> resources = new ArrayList<>();
+        for (String region : aliyunConfig.getEffectiveRegions()) {
+            try {
+                IAcsClient client = clientFactory.createClient(region);
+
+                CommonRequest request = new CommonRequest();
+                request.setSysProtocol(ProtocolType.HTTPS);
+                request.setSysMethod(MethodType.POST);
+                request.setSysDomain("swas." + region + ".aliyuncs.com");
+                request.setSysVersion("2020-06-01");
+                request.setSysAction("ListInstances");
+                request.putQueryParameter("RegionId", region);
+                request.putQueryParameter("PageSize", "100");
+
+                CommonResponse response = client.getCommonResponse(request);
+                String responseData = response.getData();
+                log.debug("SWAS API 响应: region={}, body={}", region, responseData);
+                JsonNode root = objectMapper.readTree(responseData);
+
+                JsonNode instances = root.path("Instances");
+                if (!instances.isArray() || instances.isEmpty()) {
+                    log.info("SWAS: region={} 无实例", region);
+                    continue;
+                }
+
+                LocalDateTime now = LocalDateTime.now();
+                for (JsonNode instance : instances) {
+                    String rawExpiredTime = instance.path("ExpiredTime").asText();
+                    log.info("SWAS 实例到期时间原始值: resourceId={}, resourceName={}, ExpiredTime='{}'",
+                            instance.path("InstanceId").asText(),
+                            instance.path("InstanceName").asText(),
+                            rawExpiredTime);
+                    resources.add(ResourceInfo.builder()
+                            .resourceId(instance.path("InstanceId").asText())
+                            .resourceName(instance.path("InstanceName").asText())
+                            .resourceType("SWAS")
+                            .region(region)
+                            .status(instance.path("Status").asText())
+                            .expireTime(parseExpireTime(rawExpiredTime))
+                            .syncTime(now)
+                            .build());
+                }
+                log.info("SWAS 采集成功: region={}, count={}", region, instances.size());
+            } catch (ClientException e) {
+                log.error("SWAS 采集 API 异常: region={}, errorCode={}", region, e.getErrCode());
+                log.debug("SWAS 采集完整异常", e);
+            } catch (Exception e) {
+                log.error("SWAS 采集解析异常: region={}, {}", region, e.getMessage(), e);
             }
-            log.info("ECS 采集成功: region={}, count={}", aliyunConfig.getRegion(), resources.size());
-        } catch (ClientException e) {
-            log.error("ECS 采集 API 调用异常: {}", e.getMessage(), e);
-        } catch (Exception e) {
-            log.error("ECS 采集响应解析异常: {}", e.getMessage(), e);
+        }
+        return resources;
+    }
+
+    /**
+     * 采集 RDS 数据库实例（遍历所有配置的地域）
+     */
+    private List<ResourceInfo> collectRdsInstances() {
+        List<ResourceInfo> resources = new ArrayList<>();
+        for (String region : aliyunConfig.getEffectiveRegions()) {
+            try {
+                IAcsClient client = clientFactory.createClient(region);
+
+                CommonRequest request = new CommonRequest();
+                request.setSysProtocol(ProtocolType.HTTPS);
+                request.setSysMethod(MethodType.POST);
+                request.setSysDomain("rds.aliyuncs.com");
+                request.setSysVersion("2014-08-15");
+                request.setSysAction("DescribeDBInstances");
+                request.putQueryParameter("RegionId", region);
+                request.putQueryParameter("PageSize", "100");
+
+                CommonResponse response = client.getCommonResponse(request);
+                String responseData = response.getData();
+                log.debug("RDS API 响应: region={}, body={}", region, responseData);
+                JsonNode root = objectMapper.readTree(responseData);
+
+                JsonNode instances = root.path("Items").path("DBInstance");
+                if (!instances.isArray() || instances.isEmpty()) {
+                    log.info("RDS: region={} 无实例", region);
+                    continue;
+                }
+
+                LocalDateTime now = LocalDateTime.now();
+                for (JsonNode instance : instances) {
+                    resources.add(ResourceInfo.builder()
+                            .resourceId(instance.path("DBInstanceId").asText())
+                            .resourceName(instance.path("DBInstanceDescription").asText())
+                            .resourceType("RDS")
+                            .region(region)
+                            .status(instance.path("DBInstanceStatus").asText())
+                            .expireTime(parseExpireTime(instance.path("ExpireTime").asText()))
+                            .syncTime(now)
+                            .build());
+                }
+                log.info("RDS 采集成功: region={}, count={}", region, instances.size());
+            } catch (ClientException e) {
+                log.error("RDS 采集 API 异常: region={}, errorCode={}", region, e.getErrCode());
+                log.debug("RDS 采集完整异常", e);
+            } catch (Exception e) {
+                log.error("RDS 采集解析异常: region={}, {}", region, e.getMessage(), e);
+            }
         }
         return resources;
     }

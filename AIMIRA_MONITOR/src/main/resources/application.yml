@@ -26,6 +26,8 @@ aliyun:
   access-key: ${ALIYUN_ACCESS_KEY:}
   secret: ${ALIYUN_SECRET:}
   region: ${ALIYUN_REGION:cn-hangzhou}
+  # 多区域采集列表，逗号分隔；为空时回退到 region
+  regions: ${ALIYUN_REGIONS:cn-guangzhou,cn-shenzhen,cn-hangzhou,cn-hongkong}
 
 # ---- 企业微信配置 ----
 wecom:

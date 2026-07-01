@@ -268,7 +268,9 @@ curl -X POST http://localhost:8080/api/dashboard/trigger/alarm
     {
       "Effect": "Allow",
       "Action": [
-        "ecs:DescribeInstances"
+        "ecs:DescribeInstances",
+        "rds:DescribeDBInstances",
+        "swas:ListInstances"
       ],
       "Resource": "*"
     }
@@ -283,13 +285,15 @@ curl -X POST http://localhost:8080/api/dashboard/trigger/alarm
 | `QueryAccountBalance` | 采集账户余额 | `bssapi:QueryAccountBalance` | 费用中心 (BSS) |
 | `QueryBill` | 采集账单费用 | `bssapi:QueryBill` | 费用中心 (BSS) |
 | `DescribeInstances` | 采集 ECS 实例及到期时间 | `ecs:DescribeInstances` | 弹性计算 (ECS) |
+| `ListInstances` | 采集 SWAS 轻量应用服务器 | `swas:ListInstances` | 轻量应用服务器 (SWAS) |
+| `DescribeDBInstances` | 采集 RDS 实例及到期时间 | `rds:DescribeDBInstances` | 云数据库 (RDS) |
 
 ### 最小权限汇总
 
 | 方案 | 说明 | 推荐度 |
 |------|------|--------|
-| **自定义策略**（推荐） | 仅上述 3 个 Action，权限最小化 | ⭐⭐⭐ |
-| `AliyunBSSReadOnlyAccess` + `AliyunECSReadOnlyAccess` | 系统预置只读策略，但权限范围比实际需要的宽 | ⭐⭐ |
+| **自定义策略**（推荐） | 仅上述 5 个 Action，权限最小化 | ⭐⭐⭐ |
+| `AliyunBSSReadOnlyAccess` + `AliyunECSReadOnlyAccess` + `AliyunRDSReadOnlyAccess` | 系统预置只读策略，但权限范围比实际需要的宽 | ⭐⭐ |
 | 主账号 AK | 拥有全部权限，风险极大 | ❌ 禁止 |
 
 ### RAM 子账号创建步骤
@@ -313,6 +317,7 @@ curl -X POST http://localhost:8080/api/dashboard/trigger/alarm
 ALIYUN_ACCESS_KEY=your_access_key_here
 ALIYUN_SECRET=your_secret_here
 ALIYUN_REGION=cn-hangzhou
+ALIYUN_REGIONS=cn-guangzhou,cn-shenzhen,cn-hangzhou,cn-hongkong
 
 # === 数据库密码 ===
 DB_PASSWORD=aimira123
@@ -331,7 +336,8 @@ ALARM_COOLDOWN_SECONDS=86400           # 告警冷却：24小时（同一规则+
 |----------|------|--------|------|
 | `ALIYUN_ACCESS_KEY` | ✅ 是 | — | 阿里云 RAM 子账号 AccessKey |
 | `ALIYUN_SECRET` | ✅ 是 | — | 阿里云 RAM 子账号 Secret |
-| `ALIYUN_REGION` | 否 | `cn-hangzhou` | 阿里云 Region |
+| `ALIYUN_REGION` | 否 | `cn-hangzhou` | 阿里云默认 Region |
+| `ALIYUN_REGIONS` | 否 | `cn-guangzhou,cn-shenzhen,cn-hangzhou,cn-hongkong` | 多区域采集列表（逗号分隔），为空时回退到 `ALIYUN_REGION` |
 | `DB_HOST` | 否 | `localhost` | PostgreSQL 主机 |
 | `DB_PORT` | 否 | `5432` | PostgreSQL 端口 |
 | `DB_NAME` | 否 | `aimira_monitor` | 数据库名 |
@@ -452,7 +458,7 @@ docker compose build --no-cache
 |------|------|------|----------|
 | 10 | **阿里云 API 变更** | SDK 版本过老，API 升级后采集失败 | 关注阿里云 API 变更公告；保持 SDK 版本更新 |
 | 11 | **时区不一致** | 系统时区与阿里云账单时区不同，数据偏差 | 已配置 `Asia/Shanghai` 时区；注意容器时区设置 |
-| 12 | **只采集 ECS 资源** | RDS、SLB、Redis 等资源到期无法感知 | V2 版本补充更多资源类型采集（代码中已有 TODO） |
+| 12 | **只采集 ECS/RDS/SWAS 资源** | 其他资源类型（SLB、Redis、OSS 等）到期无法感知 | V2 版本补充更多资源类型采集（代码中已有 TODO） |
 | 13 | **Cron 表达式错误** | 修改配置后 cron 不生效，采集/告警停止 | 使用在线 Cron 工具验证；修改后观察日志确认任务执行 |
 | 14 | **余额精度** | 金额使用 `NUMERIC(18,2)`，汇率换算等场景可能精度不足 | 常规场景足够；跨境场景需评估是否需要更高精度 |
 

@@ -48,7 +48,7 @@ boss/AIMIRA_MONITOR/
     │   │   ├── AliyunClientFactory.java       # ACS 客户端工厂
     │   │   ├── BalanceCollector.java          # 余额采集 (BSSOpenApi QueryAccountBalance)
     │   │   ├── BillingCollector.java          # 账单采集 (BSSOpenApi QueryBill)
-    │   │   └── ResourceCollector.java         # 资源采集 (ECS DescribeInstances)
+    │   │   └── ResourceCollector.java         # 资源采集 (ECS/RDS/SWAS 多区域遍历)
     │   ├── scheduler/                         # 定时任务调度
     │   │   └── CollectScheduler.java          # 每小时采集调度 (balance + billing + resource)
     │   ├── alarm/                             # 告警模块
@@ -99,7 +99,7 @@ boss/AIMIRA_MONITOR/
 │  CollectScheduler (每小时)         AlarmScheduler (每小时)        │
 │  ├─ BalanceCollector ──→ BSSOpenApi     │                       │
 │  ├─ BillingCollector  ──→ BSSOpenApi     │                       │
-│  └─ ResourceCollector ──→ ECS API        │                       │
+│  └─ ResourceCollector ──→ ECS/SWAS/RDS API    │                       │
 │         │                                ▼                       │
 │         ▼                         AlarmDetector                  │
 │    [PostgreSQL] ◄───────────  ├─ 余额阈值检测                    │
@@ -190,7 +190,8 @@ boss/AIMIRA_MONITOR/
 |----------|--------|------|
 | `ALIYUN_ACCESS_KEY` | — | 阿里云 AccessKey |
 | `ALIYUN_SECRET` | — | 阿里云 Secret |
-| `ALIYUN_REGION` | `cn-hangzhou` | 阿里云 Region |
+| `ALIYUN_REGION` | `cn-hangzhou` | 阿里云默认 Region |
+| `ALIYUN_REGIONS` | `cn-guangzhou,cn-shenzhen,cn-hangzhou,cn-hongkong` | 多区域采集列表，逗号分隔 |
 | `DB_HOST` | `localhost` | PostgreSQL 主机 |
 | `DB_PORT` | `5432` | PostgreSQL 端口 |
 | `DB_NAME` | `aimira_monitor` | 数据库名 |
@@ -348,7 +349,7 @@ docker compose up -d
 
 | 序号 | 位置 | 问题描述 | 优先级 |
 |------|------|----------|--------|
-| 1 | `ResourceCollector.java` | 当前仅采集 ECS 实例，RDS/SLB/Redis 待 V2 支持 (代码中有 TODO) | P2 |
+| 1 | `ResourceCollector.java` | 当前仅采集 ECS/SWAS/RDS 实例，SLB/Redis/OSS 待 V2 支持 (代码中有 TODO) | P2 |
 | 2 | `BillingCollector.java` | 仅处理按量付费(PayAsYouGoBill)，未覆盖包年包月 | P2 |
 | 3 | `diff-review_claude.md` | 技术栈描述过时 (仍写 SB 2.x / Java 8 / MySQL)，仅作评审流程参考 | P3 |
 | 4 | 项目整体 | 无全局异常处理器 (`@ControllerAdvice`)，异常直接抛给 Tomcat 默认处理 | P2 |
@@ -356,9 +357,7 @@ docker compose up -d
 | 6 | 项目整体 | 无事务管理 (单表操作暂不影响，多表操作时需补充 `@Transactional`) | P2 |
 | 7 | 项目整体 | Entity 使用 `@PrePersist`/`@PreUpdate` 设置时间戳，但未使用 `@MappedSuperclass` 提取公共字段 | P3 |
 | 8 | 项目整体 | 无单元测试覆盖 (仅一个空的上下文加载测试) | P1 |
-| 9 | `BillingCollector.java` | 域名仍为错误的 `bssopenapi.aliyuncs.com`，需改为 `business.aliyuncs.com` 并加 HTTPS | P0 |
-| 10 | `ResourceCollector.java` | 缺少 HTTPS 显式声明，AK 泄漏风险同 BalanceCollector | P0 |
-| 11 | `BalanceCollector.java` | 域名和 HTTPS 已修复，AK泄漏已处理 ✅ | — |
+| 9 | `application.yml` | `ALIYUN_REGIONS` 默认值不可包含国际站地域（如 `eu-west-1`），中国站账号不互通 | P1 |
 
 > 📝 踩坑详情见 `踩坑记录.md`
 
