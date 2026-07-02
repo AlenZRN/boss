@@ -112,6 +112,7 @@ boss/AIMIRA_MONITOR/
 │   GET /api/dashboard/trend/balance                               │
 │   GET /api/dashboard/trend/billing                               │
 │   CRUD /api/dashboard/alarm-rules                                │
+│   GET /api/dashboard/alarm-records                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -158,6 +159,7 @@ boss/AIMIRA_MONITOR/
 | POST | `/api/dashboard/alarm-rules` | 创建规则 |
 | PUT | `/api/dashboard/alarm-rules/{id}` | 更新规则 |
 | DELETE | `/api/dashboard/alarm-rules/{id}` | 删除规则 |
+| GET | `/api/dashboard/alarm-records?page=0&size=20` | 分页查询告警发送记录（按发送时间倒序） |
 
 ### 手动触发
 

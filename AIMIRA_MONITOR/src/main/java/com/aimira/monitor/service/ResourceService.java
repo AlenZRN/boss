@@ -64,4 +64,20 @@ public class ResourceService {
         LocalDateTime threshold = LocalDateTime.now().plusDays(days);
         return resourceInfoRepository.countExpiringResources(threshold);
     }
+
+    /** 多条件分页查询资源 */
+    public Page<ResourceInfo> searchResources(String keyword, String resourceType,
+                                               String region, String status, Pageable pageable) {
+        return resourceInfoRepository.searchResources(keyword, resourceType, region, status, pageable);
+    }
+
+    /** 按资源类型统计数量 */
+    public List<Object[]> countByResourceType() {
+        return resourceInfoRepository.countByResourceType();
+    }
+
+    /** 按地域统计数量 */
+    public List<Object[]> countByRegion() {
+        return resourceInfoRepository.countByRegion();
+    }
 }

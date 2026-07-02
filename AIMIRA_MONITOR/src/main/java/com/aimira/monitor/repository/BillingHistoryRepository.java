@@ -6,6 +6,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -19,4 +22,12 @@ public interface BillingHistoryRepository extends JpaRepository<BillingHistory, 
     /** 获取指定时间范围内的费用历史（用于趋势图） */
     @Query("SELECT b FROM BillingHistory b WHERE b.syncTime BETWEEN :start AND :end ORDER BY b.syncTime ASC")
     List<BillingHistory> findBySyncTimeBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    /** 获取费用历史（分页，按同步时间倒序） */
+    @Query("SELECT b FROM BillingHistory b ORDER BY b.syncTime DESC")
+    Page<BillingHistory> findAllByOrderBySyncTimeDesc(Pageable pageable);
+
+    /** 按时间范围分页查询费用历史 */
+    @Query("SELECT b FROM BillingHistory b WHERE b.syncTime BETWEEN :start AND :end ORDER BY b.syncTime DESC")
+    Page<BillingHistory> findBySyncTimeBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
 }

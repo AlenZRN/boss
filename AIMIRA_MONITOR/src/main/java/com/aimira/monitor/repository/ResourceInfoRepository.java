@@ -35,4 +35,24 @@ public interface ResourceInfoRepository extends JpaRepository<ResourceInfo, Long
     /** 统计即将到期的资源数量 */
     @Query("SELECT COUNT(r) FROM ResourceInfo r WHERE r.expireTime IS NOT NULL AND r.expireTime <= :threshold")
     long countExpiringResources(@Param("threshold") LocalDateTime threshold);
+
+    /** 多条件查询资源（分页）：关键字匹配名称或ID，可选类型/地域/状态过滤 */
+    @Query("SELECT r FROM ResourceInfo r WHERE " +
+           "(:keyword IS NULL OR r.resourceName LIKE %:keyword% OR r.resourceId LIKE %:keyword%) " +
+           "AND (:resourceType IS NULL OR r.resourceType = :resourceType) " +
+           "AND (:region IS NULL OR r.region = :region) " +
+           "AND (:status IS NULL OR r.status = :status)")
+    Page<ResourceInfo> searchResources(@Param("keyword") String keyword,
+                                       @Param("resourceType") String resourceType,
+                                       @Param("region") String region,
+                                       @Param("status") String status,
+                                       Pageable pageable);
+
+    /** 按资源类型统计数量 */
+    @Query("SELECT r.resourceType, COUNT(r) FROM ResourceInfo r GROUP BY r.resourceType")
+    List<Object[]> countByResourceType();
+
+    /** 按地域统计数量 */
+    @Query("SELECT r.region, COUNT(r) FROM ResourceInfo r GROUP BY r.region")
+    List<Object[]> countByRegion();
 }

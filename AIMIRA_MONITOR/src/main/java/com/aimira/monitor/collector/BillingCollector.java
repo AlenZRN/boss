@@ -106,7 +106,9 @@ public class BillingCollector {
             return BigDecimal.ZERO;
         }
         try {
-            return new BigDecimal(value).setScale(2, RoundingMode.HALF_UP);
+            // API 返回的金额可能带千分位逗号（如 "5,322.01"），需要先去掉
+            String cleaned = value.replace(",", "");
+            return new BigDecimal(cleaned).setScale(2, RoundingMode.HALF_UP);
         } catch (NumberFormatException e) {
             log.warn("金额解析失败: {}", value);
             return BigDecimal.ZERO;

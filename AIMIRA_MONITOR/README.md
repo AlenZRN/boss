@@ -197,6 +197,7 @@ curl "http://localhost:8080/api/dashboard/trend/billing?days=30"
 | `POST` | `/api/dashboard/alarm-rules` | 创建告警规则 |
 | `PUT` | `/api/dashboard/alarm-rules/{id}` | 更新告警规则 |
 | `DELETE` | `/api/dashboard/alarm-rules/{id}` | 删除告警规则 |
+| `GET` | `/api/dashboard/alarm-records?page=0&size=20` | 分页查询告警发送记录（按时间倒序） |
 
 **创建规则示例：**
 
@@ -368,6 +369,8 @@ ALARM_COOLDOWN_SECONDS=86400           # 告警冷却：24小时（同一规则+
 
 同一规则 + 同一资源（或余额），默认 **24 小时内只发送一次**，防止重复刷屏。
 
+冷却命中时会在日志中打印详细信息（INFO 级别），包括：冷却时长、上次发送时间、剩余冷却秒数，便于排查告警为何被拦截。
+
 ### 通知格式
 
 企业微信机器人收到 Markdown 格式消息，示例：
@@ -499,6 +502,13 @@ curl -X PUT http://localhost:8080/api/dashboard/alarm-rules/1 \
 修改 `.env` 中的 cron 表达式，然后重启服务。例如改为每 30 分钟采集一次：
 ```bash
 SCHEDULER_COLLECT_CRON=0 */30 * * * *
+```
+
+### Q: 如何查看最近发送了哪些告警？
+
+通过 API 查询告警记录：
+```bash
+curl "http://localhost:8080/api/dashboard/alarm-records?page=0&size=20"
 ```
 
 ### Q: 能不能同时监控多个阿里云账号？

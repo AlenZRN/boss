@@ -3,6 +3,7 @@ package com.aimira.monitor.dashboard;
 import com.aimira.monitor.alarm.AlarmScheduler;
 import com.aimira.monitor.dto.ApiResponse;
 import com.aimira.monitor.dto.DashboardDTO;
+import com.aimira.monitor.entity.AlarmRecord;
 import com.aimira.monitor.entity.AlarmRule;
 import com.aimira.monitor.entity.BalanceHistory;
 import com.aimira.monitor.entity.BillingHistory;
@@ -140,6 +141,15 @@ public class DashboardController {
     @GetMapping("/alarm-rules")
     public ApiResponse<List<AlarmRule>> getAlarmRules() {
         return ApiResponse.success(alarmService.listRules());
+    }
+
+    @Operation(summary = "查询告警记录", description = "分页查询告警发送记录，可按时间倒序查看最近触发的告警")
+    @GetMapping("/alarm-records")
+    public ApiResponse<Page<AlarmRecord>> getAlarmRecords(
+            @Parameter(description = "页码，从0开始") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "每页大小") @RequestParam(defaultValue = "20") int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "sentTime"));
+        return ApiResponse.success(alarmService.listRecords(pageRequest));
     }
 
     @Operation(summary = "创建告警规则", description = "新增一条告警规则（BALANCE 或 EXPIRY 类型）")

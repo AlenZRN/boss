@@ -3,6 +3,8 @@ package com.aimira.monitor.service;
 import com.aimira.monitor.entity.BillingHistory;
 import com.aimira.monitor.repository.BillingHistoryRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -33,5 +35,15 @@ public class BillingService {
         LocalDateTime end = LocalDateTime.now();
         LocalDateTime start = end.minusDays(days);
         return billingHistoryRepository.findBySyncTimeBetween(start, end);
+    }
+
+    /** 分页查询费用历史（按同步时间倒序） */
+    public Page<BillingHistory> findAll(Pageable pageable) {
+        return billingHistoryRepository.findAllByOrderBySyncTimeDesc(pageable);
+    }
+
+    /** 按时间范围分页查询费用历史 */
+    public Page<BillingHistory> findByTimeRange(LocalDateTime start, LocalDateTime end, Pageable pageable) {
+        return billingHistoryRepository.findBySyncTimeBetween(start, end, pageable);
     }
 }

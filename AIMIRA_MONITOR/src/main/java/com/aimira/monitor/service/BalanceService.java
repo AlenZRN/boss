@@ -3,9 +3,10 @@ package com.aimira.monitor.service;
 import com.aimira.monitor.entity.BalanceHistory;
 import com.aimira.monitor.repository.BalanceHistoryRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -34,5 +35,15 @@ public class BalanceService {
         LocalDateTime end = LocalDateTime.now();
         LocalDateTime start = end.minusDays(days);
         return balanceHistoryRepository.findBySyncTimeBetween(start, end);
+    }
+
+    /** 分页查询余额历史（按同步时间倒序） */
+    public Page<BalanceHistory> findAll(Pageable pageable) {
+        return balanceHistoryRepository.findAllByOrderBySyncTimeDesc(pageable);
+    }
+
+    /** 按时间范围分页查询余额历史 */
+    public Page<BalanceHistory> findByTimeRange(LocalDateTime start, LocalDateTime end, Pageable pageable) {
+        return balanceHistoryRepository.findBySyncTimeBetween(start, end, pageable);
     }
 }

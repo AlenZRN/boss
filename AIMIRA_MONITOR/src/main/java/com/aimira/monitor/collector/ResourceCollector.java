@@ -32,8 +32,12 @@ public class ResourceCollector {
     private final AliyunConfig aliyunConfig;
     private final ObjectMapper objectMapper;
 
+    // 阿里云 API 返回的过期时间有两种格式：
+    //   带秒:   2026-06-20T16:00:00Z
+    //   不带秒: 2026-11-18T16:00Z
+    // 使用 [] 让 :ss 变为可选，兼容两种格式
     private static final DateTimeFormatter ALIYUN_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm[:ss]'Z'");
 
     public ResourceCollector(AliyunClientFactory clientFactory, AliyunConfig aliyunConfig) {
         this.clientFactory = clientFactory;
@@ -65,7 +69,7 @@ public class ResourceCollector {
                 CommonRequest request = new CommonRequest();
                 request.setSysProtocol(ProtocolType.HTTPS);
                 request.setSysMethod(MethodType.POST);
-                request.setSysDomain("ecs.aliyuncs.com");
+                request.setSysDomain("ecs." + region + ".aliyuncs.com");
                 request.setSysVersion("2014-05-26");
                 request.setSysAction("DescribeInstances");
                 request.putQueryParameter("RegionId", region);
@@ -175,7 +179,7 @@ public class ResourceCollector {
                 CommonRequest request = new CommonRequest();
                 request.setSysProtocol(ProtocolType.HTTPS);
                 request.setSysMethod(MethodType.POST);
-                request.setSysDomain("rds.aliyuncs.com");
+                request.setSysDomain("rds." + region + ".aliyuncs.com");
                 request.setSysVersion("2014-08-15");
                 request.setSysAction("DescribeDBInstances");
                 request.putQueryParameter("RegionId", region);

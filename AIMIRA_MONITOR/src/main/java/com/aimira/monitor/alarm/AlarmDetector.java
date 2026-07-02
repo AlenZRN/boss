@@ -8,6 +8,7 @@ import com.aimira.monitor.repository.AlarmRuleRepository;
 import com.aimira.monitor.service.BalanceService;
 import com.aimira.monitor.service.ResourceService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -75,7 +76,6 @@ public class AlarmDetector {
         for (AlarmRule rule : rules) {
             // 检查冷却时间
             if (isInCooldown(rule.getId(), null)) {
-                log.debug("余额告警在冷却期内: ruleId={}", rule.getId());
                 continue;
             }
 
@@ -118,8 +118,6 @@ public class AlarmDetector {
             for (AlarmRule rule : rules) {
                 // 检查冷却时间（按资源 + 规则去重）
                 if (isInCooldown(rule.getId(), resource.getResourceId())) {
-                    log.debug("到期告警在冷却期内: ruleId={}, resourceId={}",
-                            rule.getId(), resource.getResourceId());
                     continue;
                 }
 
@@ -138,11 +136,28 @@ public class AlarmDetector {
     }
 
     /**
-     * 检查是否在冷却时间内
+     * 检查是否在冷却时间内，如在冷却期内则打印详细信息
      */
     private boolean isInCooldown(Long ruleId, String resourceId) {
-        LocalDateTime since = LocalDateTime.now().minusSeconds(schedulerConfig.getAlarmCooldownSeconds());
-        return alarmRecordRepository.existsWithinCooldown(ruleId, resourceId, since);
+        long cooldownSeconds = schedulerConfig.getAlarmCooldownSeconds();
+        LocalDateTime since = LocalDateTime.now().minusSeconds(cooldownSeconds);
+        boolean inCooldown = alarmRecordRepository.existsWithinCooldown(ruleId, resourceId, since);
+        if (inCooldown) {
+            List<LocalDateTime> lastTimes = alarmRecordRepository.findLastSentTimes(
+                    ruleId, resourceId, PageRequest.of(0, 1));
+            if (!lastTimes.isEmpty()) {
+                LocalDateTime lastSent = lastTimes.get(0);
+                long secondsAgo = ChronoUnit.SECONDS.between(lastSent, LocalDateTime.now());
+                long remaining = cooldownSeconds - secondsAgo;
+                log.info("告警在冷却期内: ruleId={}, resourceId={}, 冷却时长={}s, 上次发送={}, {}s前, 剩余={}s",
+                        ruleId, resourceId, cooldownSeconds,
+                        FMT.format(lastSent), secondsAgo, Math.max(0, remaining));
+            } else {
+                log.info("告警在冷却期内: ruleId={}, resourceId={}, 冷却时长={}s (未查到上次发送记录)",
+                        ruleId, resourceId, cooldownSeconds);
+            }
+        }
+        return inCooldown;
     }
 
     /**
