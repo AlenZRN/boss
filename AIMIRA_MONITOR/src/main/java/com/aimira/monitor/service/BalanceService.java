@@ -46,4 +46,31 @@ public class BalanceService {
     public Page<BalanceHistory> findByTimeRange(LocalDateTime start, LocalDateTime end, Pageable pageable) {
         return balanceHistoryRepository.findBySyncTimeBetween(start, end, pageable);
     }
+
+    /** 按云厂商获取最新余额 */
+    public BalanceHistory getLatestByCloudProvider(String provider) {
+        return balanceHistoryRepository.findTopByCloudProviderOrderBySyncTimeDesc(provider).orElse(null);
+    }
+
+    /** 按云厂商获取最近 N 天的余额趋势 */
+    public List<BalanceHistory> getTrendByCloudProvider(int days, String cloudProvider) {
+        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime start = end.minusDays(days);
+        return balanceHistoryRepository.findByCloudProviderAndSyncTimeBetween(cloudProvider, start, end);
+    }
+
+    /** 按云厂商分页查询余额历史 */
+    public Page<BalanceHistory> findAllByCloudProvider(String cloudProvider, Pageable pageable) {
+        return balanceHistoryRepository.findAllByCloudProviderOrderBySyncTimeDesc(cloudProvider, pageable);
+    }
+
+    /** 按云厂商 + 时间范围分页查询余额历史 */
+    public Page<BalanceHistory> findByTimeRangeAndCloudProvider(LocalDateTime start, LocalDateTime end, String cloudProvider, Pageable pageable) {
+        return balanceHistoryRepository.findByCloudProviderAndSyncTimeBetween(cloudProvider, start, end, pageable);
+    }
+
+    /** 获取所有已采集的云厂商列表 */
+    public List<String> getDistinctCloudProviders() {
+        return balanceHistoryRepository.findDistinctCloudProviders();
+    }
 }

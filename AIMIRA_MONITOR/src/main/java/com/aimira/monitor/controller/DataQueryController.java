@@ -47,7 +47,7 @@ public class DataQueryController {
     /**
      * 多条件分页查询资源列表
      */
-    @Operation(summary = "查询资源列表", description = "多条件分页查询云资源，支持关键字（名称/ID）、类型、地域、状态过滤")
+    @Operation(summary = "查询资源列表", description = "多条件分页查询云资源，支持关键字（名称/ID）、类型、地域、状态、云厂商过滤")
     @GetMapping("/resources")
     public ApiResponse<Page<ResourceInfo>> queryResources(
             @Parameter(description = "搜索关键字（匹配资源名称或ID）")
@@ -58,6 +58,8 @@ public class DataQueryController {
             @RequestParam(required = false) String region,
             @Parameter(description = "状态，如 Running / Stopped")
             @RequestParam(required = false) String status,
+            @Parameter(description = "云厂商标识（ALIYUN / VOLCENGINE），不传默认全量")
+            @RequestParam(required = false) String cloudProvider,
             @Parameter(description = "页码，从0开始")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "每页大小")
@@ -69,22 +71,24 @@ public class DataQueryController {
 
         Sort sort = Sort.by("desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC, sortBy);
         PageRequest pageRequest = PageRequest.of(page, size, sort);
-        Page<ResourceInfo> result = resourceService.searchResources(keyword, resourceType, region, status, pageRequest);
+        Page<ResourceInfo> result = resourceService.searchResources(keyword, resourceType, region, status, cloudProvider, pageRequest);
         return ApiResponse.success(result);
     }
 
     /**
      * 资源统计：按类型和地域分组计数
      */
-    @Operation(summary = "资源统计", description = "返回按资源类型和地域分组的数量统计")
+    @Operation(summary = "资源统计", description = "返回按资源类型和地域分组的数量统计，支持按云厂商筛选")
     @GetMapping("/resources/stats")
-    public ApiResponse<Map<String, Object>> getResourceStats() {
-        Map<String, Long> byType = resourceService.countByResourceType().stream()
+    public ApiResponse<Map<String, Object>> getResourceStats(
+            @Parameter(description = "云厂商标识（ALIYUN / VOLCENGINE），不传默认全量")
+            @RequestParam(required = false) String cloudProvider) {
+        Map<String, Long> byType = resourceService.countByResourceType(cloudProvider).stream()
                 .collect(Collectors.toMap(
                         row -> (String) row[0],
                         row -> (Long) row[1]
                 ));
-        Map<String, Long> byRegion = resourceService.countByRegion().stream()
+        Map<String, Long> byRegion = resourceService.countByRegion(cloudProvider).stream()
                 .collect(Collectors.toMap(
                         row -> (String) row[0],
                         row -> (Long) row[1]
@@ -101,13 +105,15 @@ public class DataQueryController {
     /**
      * 分页查询余额历史
      */
-    @Operation(summary = "查询余额历史", description = "分页查询账户余额历史记录，可按时间范围筛选")
+    @Operation(summary = "查询余额历史", description = "分页查询账户余额历史记录，可按时间范围和云厂商筛选")
     @GetMapping("/balances")
     public ApiResponse<Page<BalanceHistory>> queryBalances(
             @Parameter(description = "开始时间（ISO格式），如 2026-06-01T00:00:00")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @Parameter(description = "结束时间（ISO格式），如 2026-07-01T23:59:59")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
+            @Parameter(description = "云厂商标识（ALIYUN / VOLCENGINE），不传默认全量")
+            @RequestParam(required = false) String cloudProvider,
             @Parameter(description = "页码，从0开始")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "每页大小")
@@ -115,7 +121,11 @@ public class DataQueryController {
 
         PageRequest pageRequest = PageRequest.of(page, size);
         Page<BalanceHistory> result;
-        if (start != null && end != null) {
+        if (cloudProvider != null && start != null && end != null) {
+            result = balanceService.findByTimeRangeAndCloudProvider(start, end, cloudProvider, pageRequest);
+        } else if (cloudProvider != null) {
+            result = balanceService.findAllByCloudProvider(cloudProvider, pageRequest);
+        } else if (start != null && end != null) {
             result = balanceService.findByTimeRange(start, end, pageRequest);
         } else {
             result = balanceService.findAll(pageRequest);
@@ -128,13 +138,15 @@ public class DataQueryController {
     /**
      * 分页查询费用历史
      */
-    @Operation(summary = "查询费用历史", description = "分页查询账单费用历史记录，可按时间范围筛选")
+    @Operation(summary = "查询费用历史", description = "分页查询账单费用历史记录，可按时间范围和云厂商筛选")
     @GetMapping("/billings")
     public ApiResponse<Page<BillingHistory>> queryBillings(
             @Parameter(description = "开始时间（ISO格式），如 2026-06-01T00:00:00")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @Parameter(description = "结束时间（ISO格式），如 2026-07-01T23:59:59")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
+            @Parameter(description = "云厂商标识（ALIYUN / VOLCENGINE），不传默认全量")
+            @RequestParam(required = false) String cloudProvider,
             @Parameter(description = "页码，从0开始")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "每页大小")
@@ -142,7 +154,11 @@ public class DataQueryController {
 
         PageRequest pageRequest = PageRequest.of(page, size);
         Page<BillingHistory> result;
-        if (start != null && end != null) {
+        if (cloudProvider != null && start != null && end != null) {
+            result = billingService.findByTimeRangeAndCloudProvider(start, end, cloudProvider, pageRequest);
+        } else if (cloudProvider != null) {
+            result = billingService.findAllByCloudProvider(cloudProvider, pageRequest);
+        } else if (start != null && end != null) {
             result = billingService.findByTimeRange(start, end, pageRequest);
         } else {
             result = billingService.findAll(pageRequest);

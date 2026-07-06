@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_res_type", columnList = "resourceType"),
         @Index(name = "idx_res_expire_time", columnList = "expireTime"),
         @Index(name = "idx_res_status", columnList = "status")
+}, uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"resourceId", "cloudProvider"})
 })
 @Data
 @Builder
@@ -49,6 +51,11 @@ public class ResourceInfo {
 
     /** 到期时间 */
     private LocalDateTime expireTime;
+
+    /** 云厂商标识 */
+    @Column(length = 32, nullable = false)
+    @Builder.Default
+    private String cloudProvider = "ALIYUN";
 
     /** 数据同步时间 */
     @Column(nullable = false)

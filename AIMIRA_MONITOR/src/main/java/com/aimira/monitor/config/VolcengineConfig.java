@@ -10,27 +10,24 @@ import java.util.stream.Collectors;
 
 @Data
 @Configuration
-@ConfigurationProperties(prefix = "aliyun")
-public class AliyunConfig {
+@ConfigurationProperties(prefix = "volcengine")
+public class VolcengineConfig {
 
-    /** 阿里云 AccessKey */
+    /** 火山引擎 AccessKey */
     private String accessKey;
 
-    /** 阿里云 Secret */
+    /** 火山引擎 Secret */
     private String secret;
 
-    /** 默认 Region（单区域兼容，regions 为空时使用） */
-    private String region = "cn-hangzhou";
+    /** 采集开关（默认关闭） */
+    private boolean enabled = false;
 
-    /** 需要采集的地域列表，配置为空时回退到 region */
+    /** 需要采集的地域列表 */
     private List<String> regions = Collections.emptyList();
-
-    /** 阿里云采集开关（默认开启） */
-    private boolean collectorEnabled = true;
 
     /**
      * 获取所有需要采集的地域。
-     * 优先使用 regions 列表，为空则回退到单 region。
+     * regions 为空时返回默认地域列表。
      */
     public List<String> getEffectiveRegions() {
         if (regions != null && !regions.isEmpty()) {
@@ -41,6 +38,6 @@ public class AliyunConfig {
                 return valid;
             }
         }
-        return Collections.singletonList(region != null && !region.isBlank() ? region : "cn-hangzhou");
+        return List.of("cn-beijing", "cn-shanghai", "cn-guangzhou");
     }
 }

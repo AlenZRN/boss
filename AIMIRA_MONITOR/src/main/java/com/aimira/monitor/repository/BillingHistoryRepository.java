@@ -30,4 +30,19 @@ public interface BillingHistoryRepository extends JpaRepository<BillingHistory, 
     /** 按时间范围分页查询费用历史 */
     @Query("SELECT b FROM BillingHistory b WHERE b.syncTime BETWEEN :start AND :end ORDER BY b.syncTime DESC")
     Page<BillingHistory> findBySyncTimeBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
+
+    /** 按云厂商获取最新一条费用记录 */
+    Optional<BillingHistory> findTopByCloudProviderOrderBySyncTimeDesc(String cloudProvider);
+
+    /** 按云厂商获取指定时间范围内的费用历史（用于趋势图） */
+    @Query("SELECT b FROM BillingHistory b WHERE b.cloudProvider = :cloudProvider AND b.syncTime BETWEEN :start AND :end ORDER BY b.syncTime ASC")
+    List<BillingHistory> findByCloudProviderAndSyncTimeBetween(@Param("cloudProvider") String cloudProvider, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    /** 按云厂商分页查询费用历史（按同步时间倒序） */
+    @Query("SELECT b FROM BillingHistory b WHERE b.cloudProvider = :cloudProvider ORDER BY b.syncTime DESC")
+    Page<BillingHistory> findAllByCloudProviderOrderBySyncTimeDesc(@Param("cloudProvider") String cloudProvider, Pageable pageable);
+
+    /** 按云厂商 + 时间范围分页查询费用历史 */
+    @Query("SELECT b FROM BillingHistory b WHERE b.cloudProvider = :cloudProvider AND b.syncTime BETWEEN :start AND :end ORDER BY b.syncTime DESC")
+    Page<BillingHistory> findByCloudProviderAndSyncTimeBetween(@Param("cloudProvider") String cloudProvider, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
 }

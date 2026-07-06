@@ -61,34 +61,47 @@ public class AlarmDetector {
     }
 
     /**
-     * 余额告警检测
+     * 余额告警检测 — 按 cloudProvider 分别检测，独立判断阈值
      */
     private List<AlarmRecord> detectBalanceAlarms() {
         List<AlarmRecord> records = new ArrayList<>();
 
-        BalanceHistory latestBalance = balanceService.getLatest();
-        if (latestBalance == null) {
-            log.debug("无余额数据，跳过余额告警检测");
+        List<AlarmRule> rules = alarmRuleRepository.findByAlarmTypeAndEnabledTrue("BALANCE");
+        if (rules.isEmpty()) {
             return records;
         }
 
-        List<AlarmRule> rules = alarmRuleRepository.findByAlarmTypeAndEnabledTrue("BALANCE");
-        for (AlarmRule rule : rules) {
-            // 检查冷却时间
-            if (isInCooldown(rule.getId(), null)) {
+        List<String> providers = balanceService.getDistinctCloudProviders();
+        if (providers.isEmpty()) {
+            log.debug("无云厂商余额数据，跳过余额告警检测");
+            return records;
+        }
+
+        for (String provider : providers) {
+            BalanceHistory latestBalance = balanceService.getLatestByCloudProvider(provider);
+            if (latestBalance == null) {
                 continue;
             }
 
-            BigDecimal threshold = rule.getThreshold();
-            BigDecimal currentBalance = latestBalance.getBalance();
+            for (AlarmRule rule : rules) {
+                // 余额告警用 cloudProvider 做去重 key（替代 null），避免跨云冷却互相抑制
+                if (isInCooldown(rule.getId(), provider)) {
+                    continue;
+                }
 
-            if (isTriggered(currentBalance, threshold, rule.getOperator())) {
-                String message = buildBalanceAlarmMessage(rule, latestBalance);
-                AlarmRecord record = weComNotifier.send(rule.getId(), message);
-                alarmRecordRepository.save(record);
-                records.add(record);
-                log.warn("余额告警触发: ruleId={}, balance={}, threshold={}",
-                        rule.getId(), currentBalance, threshold);
+                BigDecimal threshold = rule.getThreshold();
+                BigDecimal currentBalance = latestBalance.getBalance();
+
+                if (isTriggered(currentBalance, threshold, rule.getOperator())) {
+                    String message = buildBalanceAlarmMessage(rule, latestBalance, provider);
+                    AlarmRecord record = weComNotifier.send(rule.getId(), message);
+                    // resourceId 存 provider 以区分跨云冷却
+                    record.setResourceId(provider);
+                    alarmRecordRepository.save(record);
+                    records.add(record);
+                    log.warn("[{}] 余额告警触发: ruleId={}, balance={}, threshold={}",
+                            provider, rule.getId(), currentBalance, threshold);
+                }
             }
         }
         return records;
@@ -177,15 +190,16 @@ public class AlarmDetector {
         };
     }
 
-    private String buildBalanceAlarmMessage(AlarmRule rule, BalanceHistory balance) {
+    private String buildBalanceAlarmMessage(AlarmRule rule, BalanceHistory balance, String provider) {
         return String.format("""
-                ## ⚠️ 阿里云余额告警
+                ## ⚠️ %s 余额告警
                 > 规则: **%s**
                 > 当前余额: **%s %s**
                 > 告警阈值: **%s %s**
                 > 可用金额: **%s %s**
                 > 检测时间: %s
                 """,
+                provider,
                 rule.getRuleName(),
                 balance.getBalance(), balance.getCurrency(),
                 rule.getThreshold(), balance.getCurrency(),
@@ -194,8 +208,9 @@ public class AlarmDetector {
     }
 
     private String buildExpiryAlarmMessage(AlarmRule rule, ResourceInfo resource, long daysLeft) {
+        String provider = resource.getCloudProvider() != null ? resource.getCloudProvider() : "阿里云";
         return String.format("""
-                ## ⏰ 阿里云资源到期告警
+                ## ⏰ %s 资源到期告警
                 > 规则: **%s**
                 > 资源名称: **%s**
                 > 资源ID: %s
@@ -205,6 +220,7 @@ public class AlarmDetector {
                 > 剩余天数: **%d 天**
                 > 检测时间: %s
                 """,
+                provider,
                 rule.getRuleName(),
                 resource.getResourceName(),
                 resource.getResourceId(),

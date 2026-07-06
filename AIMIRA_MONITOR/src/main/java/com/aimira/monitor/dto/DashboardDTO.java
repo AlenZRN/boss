@@ -74,6 +74,8 @@ public class DashboardDTO {
         private String resourceName;
         private String resourceType;
         private String region;
+        /** 云厂商标识 */
+        private String cloudProvider;
         private String expireTime;
         /** 剩余天数 */
         private long remainingDays;

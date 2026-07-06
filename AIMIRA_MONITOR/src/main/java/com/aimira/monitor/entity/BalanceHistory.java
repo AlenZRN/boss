@@ -38,6 +38,11 @@ public class BalanceHistory {
     @Column(length = 10)
     private String currency;
 
+    /** 云厂商标识 */
+    @Column(length = 32, nullable = false)
+    @Builder.Default
+    private String cloudProvider = "ALIYUN";
+
     /** 数据同步时间 */
     @Column(nullable = false)
     private LocalDateTime syncTime;

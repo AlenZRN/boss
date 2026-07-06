@@ -28,6 +28,16 @@ aliyun:
   region: ${ALIYUN_REGION:cn-hangzhou}
   # 多区域采集列表，逗号分隔；为空时回退到 region
   regions: ${ALIYUN_REGIONS:cn-guangzhou,cn-shenzhen,cn-hangzhou}
+  # 采集开关
+  collector:
+    enabled: ${ALIYUN_COLLECTOR_ENABLED:true}
+
+# ---- 火山云配置 ----
+volcengine:
+  access-key: ${VOLCENGINE_ACCESS_KEY:}
+  secret: ${VOLCENGINE_SECRET:}
+  enabled: ${VOLCENGINE_ENABLED:false}
+  regions: ${VOLCENGINE_REGIONS:cn-beijing,cn-shanghai,cn-guangzhou}
 
 # ---- 企业微信配置 ----
 wecom:

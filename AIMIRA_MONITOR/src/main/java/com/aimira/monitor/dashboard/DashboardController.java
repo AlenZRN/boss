@@ -55,13 +55,19 @@ public class DashboardController {
     /**
      * Dashboard 首页数据
      */
-    @Operation(summary = "首页概览", description = "返回概览卡片（余额/费用/到期数）、30天趋势、到期资源第一页")
+    @Operation(summary = "首页概览", description = "返回概览卡片（余额/费用/到期数）、30天趋势、到期资源第一页。支持按云厂商筛选")
     @GetMapping("/overview")
-    public ApiResponse<DashboardDTO> getOverview() {
+    public ApiResponse<DashboardDTO> getOverview(
+            @Parameter(description = "云厂商标识（ALIYUN / VOLCENGINE），不传默认全量汇总")
+            @RequestParam(required = false) String cloudProvider) {
         // --- 概览卡片 ---
-        BalanceHistory latestBalance = balanceService.getLatest();
-        BillingHistory latestBilling = billingService.getLatest();
-        long expiringCount = resourceService.countExpiringResources(30);
+        BalanceHistory latestBalance = cloudProvider != null
+                ? balanceService.getLatestByCloudProvider(cloudProvider)
+                : balanceService.getLatest();
+        BillingHistory latestBilling = cloudProvider != null
+                ? billingService.getLatestByCloudProvider(cloudProvider)
+                : billingService.getLatest();
+        long expiringCount = resourceService.countExpiringResources(30, cloudProvider);
 
         DashboardDTO.OverviewCard overview = DashboardDTO.OverviewCard.builder()
                 .balance(latestBalance != null ? latestBalance.getBalance() : null)
@@ -72,10 +78,10 @@ public class DashboardController {
                 .build();
 
         // --- 趋势数据 ---
-        DashboardDTO.TrendData trend = buildTrendData();
+        DashboardDTO.TrendData trend = buildTrendData(cloudProvider);
 
         // --- 到期资源列表（默认第一页） ---
-        DashboardDTO.ExpiringResourcePage expiringPage = buildExpiringResourcePage(null, 0, 10);
+        DashboardDTO.ExpiringResourcePage expiringPage = buildExpiringResourcePage(null, cloudProvider, 0, 10);
 
         DashboardDTO dashboard = DashboardDTO.builder()
                 .overview(overview)
@@ -89,25 +95,29 @@ public class DashboardController {
     /**
      * 到期资源列表（分页+搜索）
      */
-    @Operation(summary = "到期资源列表", description = "分页查询即将到期的云资源，支持关键字搜索")
+    @Operation(summary = "到期资源列表", description = "分页查询即将到期的云资源，支持关键字搜索和云厂商筛选")
     @GetMapping("/expiring-resources")
     public ApiResponse<DashboardDTO.ExpiringResourcePage> getExpiringResources(
             @Parameter(description = "搜索关键字（匹配资源名称或ID）") @RequestParam(required = false) String keyword,
+            @Parameter(description = "云厂商标识（ALIYUN / VOLCENGINE），不传默认全量") @RequestParam(required = false) String cloudProvider,
             @Parameter(description = "页码，从0开始") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size) {
 
-        DashboardDTO.ExpiringResourcePage result = buildExpiringResourcePage(keyword, page, size);
+        DashboardDTO.ExpiringResourcePage result = buildExpiringResourcePage(keyword, cloudProvider, page, size);
         return ApiResponse.success(result);
     }
 
     /**
      * 余额趋势数据
      */
-    @Operation(summary = "余额趋势", description = "返回最近N天的账户余额变化趋势")
+    @Operation(summary = "余额趋势", description = "返回最近N天的账户余额变化趋势，支持按云厂商筛选")
     @GetMapping("/trend/balance")
     public ApiResponse<List<DashboardDTO.TrendPoint>> getBalanceTrend(
-            @Parameter(description = "查询天数，默认30") @RequestParam(defaultValue = "30") int days) {
-        List<BalanceHistory> history = balanceService.getTrend(days);
+            @Parameter(description = "查询天数，默认30") @RequestParam(defaultValue = "30") int days,
+            @Parameter(description = "云厂商标识（ALIYUN / VOLCENGINE），不传默认全量") @RequestParam(required = false) String cloudProvider) {
+        List<BalanceHistory> history = cloudProvider != null
+                ? balanceService.getTrendByCloudProvider(days, cloudProvider)
+                : balanceService.getTrend(days);
         List<DashboardDTO.TrendPoint> points = history.stream()
                 .map(h -> DashboardDTO.TrendPoint.builder()
                         .date(h.getSyncTime().toLocalDate().toString())
@@ -120,11 +130,14 @@ public class DashboardController {
     /**
      * 费用趋势数据
      */
-    @Operation(summary = "费用趋势", description = "返回最近N天的日费用变化趋势")
+    @Operation(summary = "费用趋势", description = "返回最近N天的日费用变化趋势，支持按云厂商筛选")
     @GetMapping("/trend/billing")
     public ApiResponse<List<DashboardDTO.TrendPoint>> getBillingTrend(
-            @Parameter(description = "查询天数，默认30") @RequestParam(defaultValue = "30") int days) {
-        List<BillingHistory> history = billingService.getTrend(days);
+            @Parameter(description = "查询天数，默认30") @RequestParam(defaultValue = "30") int days,
+            @Parameter(description = "云厂商标识（ALIYUN / VOLCENGINE），不传默认全量") @RequestParam(required = false) String cloudProvider) {
+        List<BillingHistory> history = cloudProvider != null
+                ? billingService.getTrendByCloudProvider(days, cloudProvider)
+                : billingService.getTrend(days);
         List<DashboardDTO.TrendPoint> points = history.stream()
                 .map(h -> DashboardDTO.TrendPoint.builder()
                         .date(h.getSyncTime().toLocalDate().toString())
@@ -192,9 +205,13 @@ public class DashboardController {
 
     // ---- private helpers ----
 
-    private DashboardDTO.TrendData buildTrendData() {
-        List<BalanceHistory> balanceHistory = balanceService.getTrend(30);
-        List<BillingHistory> billingHistory = billingService.getTrend(30);
+    private DashboardDTO.TrendData buildTrendData(String cloudProvider) {
+        List<BalanceHistory> balanceHistory = cloudProvider != null
+                ? balanceService.getTrendByCloudProvider(30, cloudProvider)
+                : balanceService.getTrend(30);
+        List<BillingHistory> billingHistory = cloudProvider != null
+                ? billingService.getTrendByCloudProvider(30, cloudProvider)
+                : billingService.getTrend(30);
 
         List<DashboardDTO.TrendPoint> balanceTrend = balanceHistory.stream()
                 .map(h -> DashboardDTO.TrendPoint.builder()
@@ -216,9 +233,9 @@ public class DashboardController {
                 .build();
     }
 
-    private DashboardDTO.ExpiringResourcePage buildExpiringResourcePage(String keyword, int page, int size) {
+    private DashboardDTO.ExpiringResourcePage buildExpiringResourcePage(String keyword, String cloudProvider, int page, int size) {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "expireTime"));
-        Page<ResourceInfo> resourcePage = resourceService.getExpiringResources(keyword, pageRequest);
+        Page<ResourceInfo> resourcePage = resourceService.getExpiringResources(keyword, cloudProvider, pageRequest);
 
         List<DashboardDTO.ExpiringResource> items = resourcePage.getContent().stream()
                 .map(r -> DashboardDTO.ExpiringResource.builder()
@@ -226,6 +243,7 @@ public class DashboardController {
                         .resourceName(r.getResourceName())
                         .resourceType(r.getResourceType())
                         .region(r.getRegion())
+                        .cloudProvider(r.getCloudProvider())
                         .expireTime(r.getExpireTime() != null ? r.getExpireTime().toString() : null)
                         .remainingDays(r.getExpireTime() != null
                                 ? ChronoUnit.DAYS.between(LocalDateTime.now(), r.getExpireTime())
