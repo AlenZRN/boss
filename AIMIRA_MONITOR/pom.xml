@@ -22,6 +22,18 @@
         <aliyun.sdk.version>3.2.1</aliyun.sdk.version>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.volcengine</groupId>
+                <artifactId>volcengine-java-sdk-bom</artifactId>
+                <version>2.0.14</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <!-- Spring Boot Web -->
         <dependency>
@@ -47,6 +59,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Micrometer Prometheus Registry -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
         <!-- PostgreSQL Driver -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -68,26 +86,29 @@
             <version>4.6.4</version>
         </dependency>
 
-        <!-- Volcengine Java SDK (按服务模块拆分) -->
+        <!-- Volcengine Java SDK (版本由 BOM 统一管理) -->
         <dependency>
             <groupId>com.volcengine</groupId>
             <artifactId>volcengine-java-sdk-core</artifactId>
-            <version>1.0.75</version>
+            <exclusions>
+                <!-- 排除老旧 swagger-annotations，统一使用 springdoc 需要的版本 -->
+                <exclusion>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.volcengine</groupId>
             <artifactId>volcengine-java-sdk-billing</artifactId>
-            <version>0.2.20</version>
         </dependency>
         <dependency>
             <groupId>com.volcengine</groupId>
             <artifactId>volcengine-java-sdk-ecs</artifactId>
-            <version>1.0.75</version>
         </dependency>
         <dependency>
             <groupId>com.volcengine</groupId>
             <artifactId>volcengine-java-sdk-rdsmysqlv2</artifactId>
-            <version>1.0.75</version>
         </dependency>
 
         <!-- Lombok -->
@@ -104,6 +125,13 @@
             <version>2.6.0</version>
         </dependency>
 
+        <!-- 显式指定 swagger-annotations 版本，避免 volcengine SDK 拉入的 2.0.0 版本覆盖 -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations</artifactId>
+            <version>2.2.22</version>
+        </dependency>
+
         <!-- Jackson -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -117,13 +145,6 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <repositories>
-        <repository>
-            <id>volcengine</id>
-            <url>https://maven.volcengine.com/repository/public/</url>
-        </repository>
-    </repositories>
 
     <build>
         <plugins>

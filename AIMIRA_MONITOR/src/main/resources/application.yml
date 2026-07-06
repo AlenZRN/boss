@@ -37,6 +37,9 @@ volcengine:
   access-key: ${VOLCENGINE_ACCESS_KEY:}
   secret: ${VOLCENGINE_SECRET:}
   enabled: ${VOLCENGINE_ENABLED:false}
+  balance-enabled: ${VOLCENGINE_BALANCE_ENABLED:true}
+  billing-enabled: ${VOLCENGINE_BILLING_ENABLED:true}
+  resources-enabled: ${VOLCENGINE_RESOURCES_ENABLED:true}
   regions: ${VOLCENGINE_REGIONS:cn-beijing,cn-shanghai,cn-guangzhou}
 
 # ---- 企业微信配置 ----
@@ -60,6 +63,16 @@ logging:
     com.aimira.monitor: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ---- Actuator 端点配置 ----
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    prometheus:
+      enabled: true
 
 # ---- SpringDoc OpenAPI (Swagger UI) ----
 springdoc:

@@ -1,6 +1,7 @@
 package com.aimira.monitor.scheduler;
 
 import com.aimira.monitor.cloud.CloudCollector;
+import com.aimira.monitor.metrics.BalanceMetrics;
 import com.aimira.monitor.service.BalanceService;
 import com.aimira.monitor.service.BillingService;
 import com.aimira.monitor.service.ResourceService;
@@ -22,15 +23,18 @@ public class CollectScheduler {
     private final BalanceService balanceService;
     private final BillingService billingService;
     private final ResourceService resourceService;
+    private final BalanceMetrics balanceMetrics;
 
     public CollectScheduler(List<CloudCollector> collectors,
                             BalanceService balanceService,
                             BillingService billingService,
-                            ResourceService resourceService) {
+                            ResourceService resourceService,
+                            BalanceMetrics balanceMetrics) {
         this.collectors = collectors;
         this.balanceService = balanceService;
         this.billingService = billingService;
         this.resourceService = resourceService;
+        this.balanceMetrics = balanceMetrics;
     }
 
     /**
@@ -61,7 +65,10 @@ public class CollectScheduler {
         long start = System.currentTimeMillis();
 
         try {
-            collector.collectBalance().ifPresent(balanceService::save);
+            collector.collectBalance().ifPresent(balance -> {
+                var saved = balanceService.save(balance);
+                balanceMetrics.recordBalance(saved);
+            });
         } catch (Exception e) {
             log.error("[{}] 余额采集失败（不影响其他操作）: {}", provider, e.getMessage(), e);
         }
